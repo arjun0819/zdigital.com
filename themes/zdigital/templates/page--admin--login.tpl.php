@@ -1,0 +1,1 @@
+<div class="container"><?php echo render($page['content']);?></div>

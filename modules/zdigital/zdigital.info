@@ -1,0 +1,6 @@
+name = Zdigital Extend Modules
+description = "Custom Special Page, please member dashboard page title etc."
+core = 7.x
+package = "Zdigital"
+
+version = "7.x-1.0"

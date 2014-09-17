@@ -1,0 +1,134 @@
+@CHARSET "UTF-8";
+.container {
+    margin-right: auto;
+    margin-left: auto;
+    padding: 0;
+}
+
+.container {
+    width: 960px;
+}
+
+.row {
+	margin: 0;
+	padding: 0;
+}
+
+.col-xs-9,.col-xs-3,
+.col-lg-12,.col-lg-11,.col-lg-10,.col-lg-9,.col-lg-8,.col-xs-6,.col-xs-3,.col-xs-2 {
+	padding: 0;
+}
+#header #menu {
+	width: 560px;
+	height: 54px;
+	padding: 0;
+}
+
+#header #block-search-form {
+	width: 197px;
+}
+
+#header #block-search-form div.form-actions .form-submit {
+	text-indent: 0;
+}
+
+#sideshow .sl_content .slide li {
+	position: relative;
+}
+
+#sideshow .sl_content .slide li .desc {
+	position: absolute;
+	left:0;
+	bottom: 0;
+	width: 100%;
+	background-color: #ddd;
+}
+
+#sideshow .sl_content .sl_bottom li {
+	float: left;
+}
+
+.sl_bottom {
+	position: absolute;
+	bottom: 0;
+}
+
+#footer .links li {
+	float: left;
+	text-align: center;
+}
+#footer  #parent-site{
+	margin: 3px 4px;
+}
+#footer #social_icons,
+#footer #social_icons li,
+#footer  #parent-site {
+	display: inline;
+}
+
+.programing.media-list .row {
+	margin: 20px -15px;
+	clear: both;
+	min-height: 231px;
+}
+.programing.media-list .row .col-xs-9 {
+	width: 713px;
+}
+.programing.media-list .row .col-xs-3 {
+	width: 218px;
+	margin-left: 40px;
+}
+
+.glyphicon.glyphicon-info-sign {
+	background: url('../images/subscribe_55.jpg') left center no-repeat;
+	display: inline-block;
+	width: 14px;
+	height: 13px;
+}
+.register.row {
+	position: relative;
+}
+#user-register-form .left-sidebar div.carbonad {
+	border-radius: 6px;
+	background-color: #fcfcfc;
+	border: 1px solid #e5e5e5;
+	padding: 20px;
+	position: relative;
+}
+.programing.media-list .row .col-xs-3 a:hover .glyphicon.glyphicon-info-sign{
+	background-image: url("../images/suscribe_hover_06.jpg");
+}
+.col-md-1, .col-md-2, .col-md-3, .col-md-4, .col-md-5, .col-md-6, .col-md-7, .col-md-8, .col-md-9, .col-md-10, .col-md-11, .col-md-12 {
+	float: left;
+}
+.col-md-4,.col-sm-4 {
+	width: 33.33333333%;
+	float: left;
+}
+.col-md-6 {
+	width: 50%;
+	padding-left:15px;
+	padding-right:15px;
+}
+.register.row .col-md-4 {
+	padding: 0;
+}
+.register.row .col-md-8 {
+	padding: 0;
+}
+.col-md-8,.col-sm-8 {
+	width: 66.66666666%;
+}
+
+.col-md-offset-7 {
+	margin-left: 58.33333333%;
+}
+.col-md-9 {
+	width: 75%;
+}
+.col-md-3 {
+	width: 25%;
+}
+.col-md-2 {
+	width: 16.66666667%;
+}

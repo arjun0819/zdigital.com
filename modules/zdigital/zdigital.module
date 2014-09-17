@@ -1,0 +1,1008 @@
+<?php
+
+define('DOMINICA_COUNTRY_CODE', 'DM');
+
+function zdigital_menu_alter(&$items) {
+	$items['user/%user']['title callback'] = 'zdigital_user_page_title';
+	
+	$items['user/register']['access callback'] = 'zdigital_user_register_access';
+	
+	$items['blog']['file path'] = drupal_get_path('module', 'zdigital');
+	$items['blog']['page callback'] = 'zdigital_blog_page_last';
+	$items['blog']['file'] = 'zdigital.page.inc';
+}
+
+function zdigital_user_register_access() {
+	global $user;
+	return $user->uid == 1 || user_is_anonymous() && variable_get('user_register', USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL);
+}
+
+function zdigital_user_page_title($account){
+	
+	return is_object($account) ? t("@name's Dashboard", array('@name'=>$account->name)) : '';
+}
+
+function zdigital_menu() {
+	$items = array();
+	
+	$items['zdigital/file'] = array(
+		'type' => MENU_CALLBACK,
+		'page callback' => 'zdigital_file_download_callback',
+		'file'=>'zdigital.page.inc',
+		'access callback' => 'user_is_logged_in'
+	);
+	
+	$items['admin/login'] = array(
+		'title'=>t('Login to Admin Dashboard'),
+		'page callback'=>'zdigital_admin_user_login_page_callback',
+		'type'=>MENU_CALLBACK,
+		'file'=>'zdigital.page.inc',
+		'access callback'=>'user_is_anonymous'
+	);
+	
+	$items['user/register/success/%'] = array(
+		'title'=>t('Subscribe Successfully'),
+		'page callback'=>'zdigital_user_register_success',
+		'page arguments' => array(3),
+		'type'=>MENU_CALLBACK,
+		'file'=>'zdigital.page.inc',
+		'access callback'=>TRUE
+	);
+	
+	$items['user/register/paypal'] = array(
+		'type' => MENU_CALLBACK,
+		'page callback' => 'zdigital_user_register_by_paypal_page_callback',
+		"access callback" => TRUE,
+		'file' => "zdigital.page.inc",
+	);
+	
+	$items['user/register/paypal/notify'] = array(
+		'type' => MENU_CALLBACK,
+		'page callback' => 'zdigital_user_register_by_paypal_notify_page_callback',
+		'access callback' => 'user_is_anonymous',
+		'file' => "zdigital.page.inc"
+	);
+	
+	$items['user/change_password'] = array(
+		'page callback' => 'zdigital_user_change_password_page_callback',
+		'access callback' => true,
+		'title callback' => 'zdigital_user_change_password_title_callback',
+		'file' => "zdigital.page.inc"
+	);
+	
+	$items['podcasts'] = array(
+		'title'=>t('podcasts'),
+		'page callback'=>'zdigital_podcasts_page_callback',
+		'type'=>MENU_CALLBACK,
+		'access callback'=>true,
+		'file'=>'zdigital.page.inc'
+	);
+	
+	$items['podcasts/%node/video_player'] = array(
+		'type' => MENU_CALLBACK,
+		'page callback' => 'zdigital_podcast_video_player_page_callback',
+		'page arguments' => array(1),
+		'access callback'=>'user_is_logged_in',
+		'file'=>'zdigital.page.inc'
+	);
+	
+	$items['podcasts/%/player'] = array(
+		'title' => t('Podcasts Play'),
+		'page callback' => 'zdigital_podcast_player_page_callback',
+		'type' => MENU_CALLBACK,
+		'access callback' => true,
+		'file'=>'zdigital.page.inc'
+	);
+	
+	$items['programming'] = array(
+		'title'=>t('programaci贸n'),
+		'page callback'=>'zdigital_programming_page_callback',
+		'type'=>MENU_CALLBACK,
+		'access callback'=>true,
+		'file'=>'zdigital.page.inc'
+	);
+	
+	$access_arguments = array('administer zdigital');
+	$items['admin/config/regional/zdigital'] = array(
+		'title' => 'Zdigital translate Country name',
+		'description' => 'Translate country names',
+		'page callback' => 'zdigital_admin_translate_country_name_callback',
+		'access arguments' => $access_arguments,
+		'file' => 'zdigital.admin.page.inc',
+	);
+	
+	$items['admin/config/regional/zdigital/translate'] = array(
+		'title' => t('Translate'),
+		'type' => MENU_DEFAULT_LOCAL_TASK,
+		'weight' => 1
+	);
+	
+	$items['admin/config/regional/zdigital/list'] = array(
+		'title' => 'Countries List',
+		'description' => 'Translate country names',
+		'page callback' => 'zdigital_admin_translate_countries_list_callback',
+		
+		'type' => MENU_LOCAL_TASK,
+		'access arguments' => $access_arguments,
+		'file' => 'zdigital.admin.page.inc',
+		'weight' => 2
+	);
+	
+
+	$items['admin/config/regional/zdigital/delete/%'] = array(
+		'title' => t('Tranlsate'),
+		'type' => MENU_CALLBACK,
+		'page callback' => 'zdigital_admin_delete_country_callback',
+		'page arguments' => array(5),
+		'access arguments' => $access_arguments,
+		'file' => 'zdigital.admin.page.inc',
+	);
+	
+	$items['admin/config/regional/zdigital/translate/%'] = array(
+		'title' => t('Tranlsate'),
+		'type' => MENU_CALLBACK,
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('zdigital_admin_translate_country_form', 5),
+		'access arguments' => $access_arguments,
+		'file' => 'zdigital.admin.page.inc',
+	);
+	
+	return $items;
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function zdigital_permission() {
+	return array(
+		'administer zdigital' => array(
+			'title' => t('Administer Zdigital'),
+			'restrict access' => TRUE,
+		)
+	);
+}
+
+/**
+ * @param unknown $ip
+ * @return Ambigous <string, mixed>
+ */
+function  zdigital_get_country_code_from_ip($ip){
+	$cache_id = 'ipaddress_'.md5($ip);
+	if($cache = cache_get($cache_id)) {
+		return $cache->data;
+	}
+	$json = file_get_contents('http://www.geoplugin.net/json.gp?ip='.$ip);
+	
+	$json_array = json_decode($json, true);
+	$country_code = !empty($json_array['geoplugin_countryCode']) ? $json_array['geoplugin_countryCode'] : 'CN';
+	cache_set($cache_id, $country_code);
+	return $country_code;
+}
+
+function zdigital_preprocess_page(&$variables) {
+	if(arg(0) == 'admin' && arg(1) == 'login') {
+		$variables['breadcrumb'] = '';
+	}
+	
+	if(arg(0) == 'blog') {
+		drupal_set_title(t('Opinión'));
+	}
+}
+
+function zdigital_preprocess_html(&$variables) {
+	
+	$data = array(
+        '#type' => 'html_tag',
+        '#tag' => 'meta',
+        '#attributes' => array(
+          'name' => 'viewport',
+          'content' => 'width=device-width, initial-scale=1',
+        )
+      );
+	drupal_add_html_head($data, 'page_keywords');
+}
+
+function zdigital_form_alter(&$form, &$form_state, $form_id) {	
+	if('admin' == arg(0) && 'user_login' == $form_id) {
+		$form['#submit'][] = 'zdigital_admin_user_login_submit';
+	}else if('user_register_form' == $form_id && 'admin' != arg(0)) {
+		drupal_set_title(t('Suscríbete'));
+
+		$form['#attributes']['onsubmit'] = 'return Drupal.validateRegisterForm(this);';
+// 		$form['account']['pass']['#theme'] = 'zdigital_password_confirm';
+		$form['actions']['submit']['#attributes']['class'][] = 'btn btn-default';
+		$form['actions']['submit']['#value'] = t('CONTINUAR');
+		$form['#theme'][] = 'zdigital_register_form';
+		
+		$form['#submit'] = array( 'zdigital_admin_user_register_submit' );
+	}else if('user_admin_settings' == $form_id) {
+		
+		$form['anonymous_settings']['#weight'] = 1;
+		$form['admin_role']['#weight'] = 2;
+		$form['registration_cancellation']['#weight'] = 3;
+		$form['personalization']['#weight'] = 4;
+		$form['email_title']['#weight'] = 6;
+		$form['email']['#weight'] = 7;
+
+		$form['registration_paymentcollation'] = array(
+			'#type' => "fieldset",
+			"#title" => t("User Reigster Payment Information"),
+			"#weight" => 5
+// 			"#group" => "email"
+		);
+		$form['registration_paymentcollation']['user_register_success_path'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Register success page path'),
+			'#default_value' => variable_get('user_register_success_path', 'user/register/success'),
+			'#description' => t('While user register success will be redirected to.')
+		);
+		$form['registration_paymentcollation']['user_register_success_page'] = array(
+			"#type" => "textarea",
+			"#title" => t("Success page content"),
+			"#default_value" => variable_get("user_register_success_page", '<p>Order #<b>@order_number</b></p>
+ 
+		<p>Thank you !username, registration was successful.</p>
+		<p></p>
+		<p>You will be sent an email confirmation and receipt of your subscription.</p>'),
+		);
+		
+		$form['registration_paymentcollation']['not_need_pay_country_code'] = array(
+			'#type' => "textfield",
+			"#title" => "Country codes does not require payment",
+			'#default_value' => variable_get('not_need_pay_country_code', DOMINICA_COUNTRY_CODE),
+			'#description' => t("Multiple values separated by commas")
+		);
+		$form['registration_paymentcollation']['payment_amount'] = array(
+			"#type" => "textfield",
+			"#title" => "Amount",
+			'#default_value' => variable_get('payment_amount', "6.8")
+		);
+		$form['registration_paymentcollation']["payment_currency"] = array(
+			"#type" => "textfield",
+			"#title" => t("Currency Code"),
+			"#default_value" => variable_get('payment_currency', "USD")
+		);
+		$form['registration_paymentcollation']['paypal_business'] = array(
+			"#type" => "textfield",
+			"#title" => t("Paypal payee account"),
+			'#default_value' => variable_get("paypal_business", "raulantonio20-facilitator@gmail.com")
+		);
+		$form['registration_paymentcollation']['paypal_server'] = array(
+			"#type" => "textfield",
+			"#title" => t("Paypal Server"),
+			"#default_value" => variable_get('paypal_server', 'www.sandbox.paypal.com'),
+			"#description" => t('Sandbox: <b>www.sandbox.paypal.com</b>, Live: www.paypal.com')
+		);
+		$form['registration_paymentcollation']["paypal_item_name"] = array(
+			"#type" => "textfield",
+			"#title" => t("Item Name"),
+			"#default_value" => variable_get("paypal_item_name", "Zdigital Account Payment"),
+			"#description" => t("Will display on Paypal Page")
+		);
+		
+	}else if('blog_node_form' == $form_id) {
+
+		drupal_add_library('system','ui.datepicker');
+		drupal_add_js(drupal_get_path('module', 'zdigital').'/js/zdigital.js');
+	}else if('posdcast_node_form' == $form_id) {
+		zdigital_extends_posdcast_node_form($form, $form_state);
+	}else if('programacion_node_form' == $form_id){
+		drupal_add_js(drupal_get_path('module', 'zdigital').'/js/zdigital.js');
+		
+		$form['shower_group'] = array(
+			'#type' => 'container',
+			'#tree' => 0,
+			'#access' => 1,
+			'#language' => 'und',
+			'#weight' => $form['field_name']['#weight'],
+			'und' => array(
+				'#title' => t('Showers'),
+				'#description' => '',
+				'#language' => 'und',
+				'#theme' => 'field_multiple_value_form',
+				'#field_name' => 'shower_group',
+				'#cardinality' => -1,
+				'#field_parents' => array('shower_group', 'und'),
+				'add_more' => array(
+					'#type'	=> 'submit',
+					'#name' => 'field_shower_group_add_more',
+					'#value' => t('Add Another Shower'),
+					'#field_name' => 'shower_group',
+					'#attributes' =>  array('class'=>array('field-add-more-submit')),
+					'#limit_validation_errors' => array(
+						array('field_name', 'und'),
+						array('field_brief_introduction', 'und')
+					),
+					'#submit' => array('zdigital_programction_field_add_more_submit'),
+					'#ajax' => array(
+						'callback' => 'zdigital_field_add_more_js', 'wrapper' => 'edit-shower-group', 'effect' => 'fade'
+					),
+					'#after_build' => array('field_form_element_after_build'),
+					'#language' => 'und',
+					'#field_parents' => array()
+				)
+			)
+		);
+		
+		unset($form['field_brief_introduction']['und']['add_more'], $form['field_name']['und']['add_more']);
+		
+		$first_brief = $form['field_brief_introduction']['und'][0];
+		$first_brief['#default_value'] = '';
+		
+		foreach(element_children($form['field_name']['und']) as $key) {
+			$field_name = $form['field_name']['und'][$key];
+			$field_name['#tree'] = 1;
+			$field_name['#parents'] = array('field_name', 'und', $key);
+			
+			$field_brief = !empty($form['field_brief_introduction']['und'][$key]) ? $form['field_brief_introduction']['und'][$key] : $first_brief;
+			$field_brief['#tree'] = 1;
+			$field_brief['#parents'] =  array('field_brief_introduction', 'und', $key);
+
+			$weight = $field_name['_weight'];
+			unset($field_brief['_weight'], $field_name['_weight']);
+
+			$field_name['#weight'] = 0;
+			$field_brief['#weight'] = 1;
+			
+			$form['shower_group']['und'][] = array(
+					$field_name, 
+					$field_brief,
+					'_weight' => $weight
+			);
+		}
+		$form['field_brief_introduction']['#prefix'] = $form['field_name']['#prefix'] = '<div style="display: none">';
+		$form['field_brief_introduction']['#suffix'] = $form['field_name']['#suffix'] = '</div>';
+		
+		array_unshift($form['actions']['submit']['#submit'], 'zdigital_programtion_edit_form_submit');
+	}else if('search_form' == $form_id) {
+		$form['basic']['keys']['#parent_class'] = array('col-md-4', 'col-sm-10', 'col-xs-8');
+	}else if('user_login' == $form_id && arg(0) != 'admin') {
+
+		$form['pass']['#parent_class'] = $form['name']['#parent_class'] = array('col-md-4', 'col-sm-4', 'col-xs-12');
+		$form['actions']['#attributes'] = array(
+			'class' => array('col-md-12', 'col-xs-12', 'col-sm-12')
+		);
+		
+		$form['links'] = array(
+			'#weight' => 100,
+			'#markup' => "<div class='clearfix col-xs-12'>".l("<i class='glyphicon glyphicon-question-sign'></i> ".t('If you forgot your password, click here to have it emailed to you'), 'user/password', array('html'=>true))."</div>"
+		);
+	}else if('user_pass' == $form_id){
+		$form['name']['#parent_class'] = array('col-md-4', 'col-sm-10', 'col-xs-8');
+		$form['actions']['#parent_class'] = array('clearfix');
+	}
+
+	if('user_register_form' == $form_id || 'user_profile_form' == $form_id) {
+		
+		$countries = zdigital_get_all_support_countries();
+		$form['field_country']['und'][0]['value']['#type'] = 'select';
+		$form['field_country']['und'][0]['value']['#options'] = $countries;
+		$form['field_country']['und'][0]['value']['#depend'] = 'field_state';
+		$form['field_country']['und'][0]['value']['#replace'] = 'field-state-add-more-wrapper';
+		unset($form['field_country']['und'][0]['value']['#size']);
+		$form['field_country']['und'][0]['value']['#attributes']['class'] = array('form-control');
+// 		$form['field_country']['und'][0]['value']['#ajax'] = array(
+// 			'callback' => 'zdigital_register_form_change_location',
+// 			'wrapper' => 'field-state-add-more-wrapper',
+//  			'method' => 'replace',
+// 			'effect' => 'fade'
+// 		);
+		
+// 		$default_country = !empty($form_state['values']['field_country']['und'][0]['value']) ? $form_state['values']['field_country']['und'][0]['value'] : '';
+// 		$default_country = empty($default_country) && !empty($form['field_country']['und'][0]['value']['#default_value']) ? $form['field_country']['und'][0]['value']['#default_value'] : $default_country;
+// 		$state = zdigital_get_regions_list($default_country, TRUE);
+		
+		
+// 		$default_state = !empty($form_state['values']['field_state']['und'][0]['value']) ? $form_state['values']['field_state']['und'][0]['value'] : '';
+// 		$default_state = empty($default_state) && !empty($form['field_state']['und'][0]['value']['#default_value']) ? $form['field_state']['und'][0]['value']['#default_value'] : $default_state;
+// 		$form['field_state']['und'][0]['value']['#type'] = 'select';
+// 		$form['field_state']['und'][0]['value']['#options'] = $state;
+// 		$form['field_state']['und'][0]['value']['#depend'] = 'field_city';
+// 		$form['field_state']['und'][0]['value']['#replace'] = 'field-city-add-more-wrapper';
+// 		unset($form['field_state']['und'][0]['value']['#size']);
+// 		$form['field_state']['und'][0]['value']['#attributes']['class'] = array('form-control');
+// 		$form['field_state']['und'][0]['value']['#ajax'] = array(
+// 			'callback' => 'zdigital_register_form_change_location',
+// 			'wrapper' => 'field-city-add-more-wrapper',
+//  			'method' => 'replace',
+// 			'effect' => 'fade'
+// 		);
+		
+// 		$city = zdigital_get_regions_list($default_state, FALSE);
+// 		$form['field_city']['und'][0]['value']['#type'] = 'select';
+// 		$form['field_city']['und'][0]['value']['#options'] = $city;
+// 		unset($form['field_city']['und'][0]['value']['#size']);
+// 		$form['field_city']['und'][0]['value']['#attributes']['class'] = array('form-control');
+	}
+}
+
+function zdigital_extends_posdcast_node_form(&$form, &$form_state) {
+// 	print '<pre>';
+// 	print_r($form);
+// 	exit();
+	drupal_add_library('system','ui.datepicker');
+	drupal_add_js(drupal_get_path('module', 'zdigital') . '/js/zdigital.js');
+	$elements = element_children($form['field_embed_id']['und']);
+	foreach ( $elements as $key => $value ) {
+		if ($key == 0 || $key != count($elements) - 1) {
+			$form['field_embed_id']['und'][$key]['#attributes']['#id'] = 'edit-field-embed-id-und-' . $key . '-value';
+			$form['field_embed_id']['und'][$key]['#id'] = 'edit-field-embed-id-und-' . $key . '-value';
+			$form['field_embed_id']['und'][$key]['#suffix'] = '<a href="#" onclick="Drupal.addVideoSource(this)">Add Audio Link</a>';
+		}
+	}
+}
+
+function zdigital_get_all_support_countries() {
+	global $language;
+
+	$results = db_select('countries', 'c')->fields('c')->execute();
+	$datas = array();
+	$commons = array('US', 'CA');
+	$countries = array();
+	foreach($results as $row) {
+		if(in_array($row->country_iso_code_2, $commons)) {
+			$countries[$row->country_id] = $language->language == 'es' && !empty($row->country_name_es) ? $row->country_name_es : $row->country_name;
+		}else{
+			$datas[$row->country_id] = $language->language == 'es' && !empty($row->country_name_es) ? $row->country_name_es : $row->country_name;
+		}
+	}
+	
+	foreach($datas as $key => $value) {
+		$countries[$key] = $value;
+	}
+	return $countries;
+}
+
+function zdigital_get_regions_list($key=null, $is_state=TRUE) {
+
+	$datas = array();
+	if($key && $is_state) {
+		$result = db_select('states', 's')->fields('s')->condition('country_id', $key)->execute();
+		foreach($result as $row) {
+			$datas[$row->rid] = t($row->name);
+		}
+	}else if($key){
+		$result = db_select('cities', 'c')->fields('c')->condition('rid', $key)->execute();
+		foreach($result as $row) {
+			$datas[$row->cid] = t($row->name);
+		}
+	}
+	
+	return $datas;
+}
+
+function zdigital_register_form_change_location(&$form, &$form_state) {
+	$button = $form_state['triggering_element'];
+	
+	$field = $button['#depend'];
+	return $form[$field];
+}
+
+
+function zdigital_programtion_edit_form_submit(&$form, &$form_state) {
+
+	foreach($form_state['values']['field_name']['und'] as $key => $value) {
+		if(empty($form_state['values']['field_brief_introduction']['und'][$key]['value'])) {
+			$form_state['values']['field_brief_introduction']['und'][$key]['value'] = ' ';
+		}
+	}
+}
+
+
+function zdigital_field_add_more_js($form, $form_state) {
+// 	$button = $form_state['triggering_element'];
+	$elements = array(
+		'field_name' => array('#array_parents' => array('field_name', 'und', 'add_more')),
+		'field_brief' => array('#array_parents' => array('field_brief_introduction', 'und', 'add_more'))
+	);
+	$fields = array();
+
+	foreach($elements as $key => $button) {
+		// Go one level up in the form, to the widgets container.
+		$element = drupal_array_get_nested_value($form, array_slice($button['#array_parents'], 0, -1));
+		$field_name = $element['#field_name'];
+		$langcode = $element['#language'];
+		$parents = $element['#field_parents'];
+	
+		$field_state = field_form_get_state($parents, $field_name, $langcode, $form_state);
+	
+		$field = $field_state['field'];
+		if ($field['cardinality'] != FIELD_CARDINALITY_UNLIMITED) {
+			return;
+		}
+	
+		// Add a DIV around the delta receiving the Ajax effect.
+		$delta = $element['#max_delta'];
+		$element[$delta]['#prefix'] = '<div class="ajax-new-content">' . (isset($element[$delta]['#prefix']) ? $element[$delta]['#prefix'] : '');
+		$element[$delta]['#suffix'] = (isset($element[$delta]['#suffix']) ? $element[$delta]['#suffix'] : '') . '</div>';
+
+		$fields[$key] = $element;
+	}
+	$element = array();
+	$field_name = $fields['field_name'];
+	$field_brief = $fields['field_brief'];
+
+	foreach(element_children($field_name) as $key => $value) {
+		$name = $field_name[$key];
+		$name['#tree'] = 1;
+		$name['#parents'] = array('field_name', 'und', $key);
+		
+		
+		$brief = $field_brief[$key];
+		$brief['#tree'] = 1;
+		$brief['#parents'] =  array('field_brief_introduction', 'und', $key);
+
+		$weight = $name['_weight'];
+		unset($name['_weight'], $brief['_weight']);
+		$element[] = array(
+			$name,
+			$brief,
+			'_weight' => $weight
+		);
+	}
+	$element = array_merge($element, array(
+		'#title' => t('Showers'),
+		'#description' => '',
+		'#language' => 'und',
+		'#theme' => 'field_multiple_value_form',
+		'#field_name' => 'shower_group',
+		'#cardinality' => -1,
+		'#field_parents' => array('shower_group', 'und'),
+		'#prefix' => '<div id="edit-shower-group-2">',
+		'#suffix' => '</div>',
+		'add_more' => array(
+			'#type'	=> 'submit',
+			'#name' => 'field_shower_group_add_more',
+			'#value' => t('Add Another Shower'),
+			'#field_name' => 'shower_group',
+			'#attributes' =>  array('class'=>array('field-add-more-submit')),
+			'#limit_validation_errors' => array(
+				array('field_name', 'und'),
+				array('field_brief_introduction', 'und')
+			),
+			'#submit' => array('zdigital_programction_field_add_more_submit'),
+			'#ajax' => array(
+				'callback' => 'zdigital_field_add_more_js', 'wrapper' => 'edit-shower-group-2', 'effect' => 'fade'
+			),
+			'#after_build' => array('field_form_element_after_build'),
+			'#language' => 'und',
+			'#field_parents' => array()
+		),
+	));
+
+	return $element;
+}
+
+function zdigital_programction_field_add_more_submit($form, &$form_state) {
+	$elements = array(
+		'field_name' => array('#array_parents' => array('field_name', 'und', 'add_more')),
+		'field_brief' => array('#array_parents' => array('field_brief_introduction', 'und', 'add_more'))
+	);
+	foreach($elements as $button) {
+		// Go one level up in the form, to the widgets container.
+		$element = drupal_array_get_nested_value ( $form, array_slice ( $button ['#array_parents'], 0, - 1 ) );
+		$field_name = $element ['#field_name'];
+		$langcode = $element ['#language'];
+		$parents = $element ['#field_parents'];
+		
+		// Increment the items count.
+		$field_state = field_form_get_state ( $parents, $field_name, $langcode, $form_state );
+		$field_state ['items_count'] ++;
+		field_form_set_state ( $parents, $field_name, $langcode, $form_state, $field_state );
+	}
+	$form_state ['rebuild'] = TRUE;
+}
+
+// function zdigital_node_load($nodes, $types){
+// 	print '<pre>';
+// 	print_r($nodes);
+// 	print_r($types);
+// 	exit();
+// }
+
+function zdigital_node_submit($node, $form, &$form_state) {
+	
+	if('blog' == $node->type) {
+		$author_name = $form_state['values']['field_author_name']['und'][0]['value'];
+
+		if(empty($form_state['values']['field_image']['und']) || $form_state['values']['field_image']['und'][0]['fid'] == '') {
+			$query = "SELECT field_image_fid, field_image_alt, field_image_title, field_image_width, field_image_height 
+					FROM field_data_field_image fi
+					INNER JOIN field_data_field_author_name fa ON fi.entity_id = fa.entity_id
+					WHERE fi.field_image_fid != ''
+					AND LOWER(fa.field_author_name_value) =  LOWER('".$author_name."')";
+			$result = db_query($query);
+			$_exsits_image = array();
+
+			foreach($result as $row) {
+				if(!empty($_exsits_image)) {
+					break;
+				}
+				$_exsits_image = array(
+					'fid' => $row->field_image_fid,
+					'display' => 1,
+					'width' => $row->field_image_width,
+					'height' => $row->field_image_height,
+					'description' => "",
+					'upload_button' => "Upload",
+					"remove_button" => "Remove",
+					"upload" => "",
+					"alt" => $row->field_image_alt,
+					"title" => $row->field_image_title
+				);
+			}
+			
+			$form_state['values']['field_image']['und'] = array($_exsits_image);
+			$node->field_image['und'] = array($_exsits_image);
+		}
+		
+		if(empty($form_state['values']['field_author_bios']['und']) || empty($form_state['values']['field_author_bios']['und'][0]) || $form_state['values']['field_author_bios']['und'][0]['value'] == '') {
+			$query = "SELECT fb.field_author_bios_value FROM field_data_field_author_bios fb INNER JOIN field_data_field_author_name fa ON fa.entity_id=fb.entity_id 
+						WHERE fb.field_author_bios_value != '' AND LOWER(fa.field_author_name_value) =  LOWER('".$author_name."')";
+			$result = db_query($query);
+			$_exsits_bios = array();
+			foreach($result as $row) {
+				if(!empty($_exsits_name)) {
+					break;
+				}
+				$_exsits_bios = array(
+					'value' => $row->field_author_bios_value
+				);
+			}
+			$form_state['values']['field_author_bios']['und'] = array($_exsits_bios);
+			$node->field_author_bios['und'] = array($_exsits_bios);
+		}
+	}
+}
+
+// function zdigital_entity_load($entities, $type) {
+// 	print '<pre>';
+// 	print_r($type);
+// 	print_r($entities);
+// 	exit();
+// }
+
+function zdigital_node_view($node, $view_mode, $langcode){
+	if('posdcast' == $node->type && arg(0) == 'node' && arg(1)) {
+		drupal_goto('podcasts/'.$node->nid);
+	}else if('programacion' == $node->type && arg(0) == 'node' && arg(1)) {
+		drupal_goto('programming');
+	}else if(user_is_logged_in() && arg(0) == 'node' && arg(1) && 3 == arg(1) && (!arg(2) || 'view' == arg(2))) {
+		global $user;
+		drupal_goto('user/'.$user->uid);
+	}else if(user_is_anonymous() && arg(0) == 'node' && 'blog' == $node->type && arg(1) && (empty($_SERVER['HTTP_USER_AGENT']) || !preg_match('/facebook|twitter/i', $_SERVER['HTTP_USER_AGENT'])) ) {
+		watchdog('watch', json_encode($_SERVER));
+		drupal_goto('user/login', array('query'=>array('destination' => 'node/'.arg(1))));
+	}
+	
+	if('blog' == $node->type && arg(1)) {
+		$datas = array(
+			'og_title' => array(
+				'#type' => 'html_tag',
+				'#tag' => 'meta',
+				'#attributes' => array(
+					'name' => 'og:title',
+					'content' => $node->title
+				),
+				'#weight' => 10
+			),
+			'og_type' => array(
+				'#type' => 'html_tag',
+				'#tag' => 'meta',
+				'#attributes' => array(
+					'name' => 'og:type',
+					'content' => 'article'
+				),
+				'#weight' => 11
+			),
+			'og_url' => array(
+				'#type' => 'html_tag',
+				'#tag' => 'meta',
+				'#attributes' => array(
+					'name' => 'og:url',
+					'content' => url($_GET['q'], array('absolute'=>TRUE))
+				),
+				'#weight' => 12
+			),
+			'og_site_name' => array(
+				'#type' => 'html_tag',
+				'#tag' => 'meta',
+				'#attributes' => array(
+					'name' => 'og:site_name',
+					'content' => variable_get('site_name')
+				),
+				'#weight' => 13
+			)
+		);
+		
+
+		foreach($datas as $key => $data) {
+			drupal_add_html_head($data, $key);
+		}
+	}
+}
+
+/**
+ * @param array $form
+ * @param array $form_state
+ */
+function zdigital_admin_user_register_submit($form, &$form_state) {
+	$admin = $form_state['values']['administer_users'];
+	
+	if (! variable_get('user_email_verification', TRUE) || $admin) {
+		$pass = $form_state['values']['pass'];
+	} else {
+		$pass = user_password();
+	}
+	$notify = ! empty($form_state['values']['notify']);
+	
+	// Remove unneeded values.
+	form_state_values_clean($form_state);
+	
+	$form_state['values']['pass'] = $pass;
+	$form_state['values']['init'] = $form_state['values']['mail'];
+	
+	$account = $form['#user'];
+
+	$no_need_payment_countries = variable_get('not_need_pay_country_code', DOMINICA_COUNTRY_CODE);
+	$country_codes = explode(',', $no_need_payment_countries);
+	$user_country = zdigital_get_country_code_from_ip(ip_address());
+	
+	entity_form_submit_build_entity('user', $account, $form, $form_state);
+	
+	// Populate $edit with the properties of $account, which have been edited on
+	// this form by taking over all values, which appear in the form values too.
+	$edit = array_intersect_key(( array ) $account, $form_state['values']);
+	if (!in_array($user_country, $country_codes)) { // @TODO: if client does not come from DOMINICA_COUNTRY_CODE
+		$prefix = 'test'.time().'_';
+		$edit['name'] = $prefix.$edit['name'];
+		$edit['mail'] = $prefix.$edit['mail'];
+		$account->status = 0;
+	}else{
+		$account->status = 1;
+		$edit['status'] = 1;
+	}
+	
+	$account = user_save($account, $edit);
+	
+	// Terminate if an error occurred during user_save().
+	if (! $account) {
+		drupal_set_message(t("Error saving user account."), 'error');
+		$form_state['redirect'] = '';
+		return;
+	}
+	$form_state['user'] = $account;
+	$form_state['values']['uid'] = $account->uid;
+	
+	watchdog('user', 'New user: %name (%email).', array(
+		'%name'=>$form_state['values']['name'],
+		'%email'=>$form_state['values']['mail']
+	), WATCHDOG_NOTICE, l(t('edit'), 'user/' . $account->uid . '/edit'));
+	
+	// Add plain text password into user account to generate mail tokens.
+	$account->password = $pass;
+	
+	// New administrative account without notification.
+	$uri = entity_uri('user', $account);
+	// @TODO
+	
+	if(!in_array($user_country, $country_codes)) {
+		drupal_goto('user/register/paypal', array( 'query'=>array( 'uid'=>$account->uid )));
+	}
+	_user_mail_notify('register_no_approval_required', $account);
+	$form_state['uid'] = $account->uid;
+	$form_state['redirect'] = array(); // @TODO
+	user_login_submit(array(), $form_state);
+	drupal_set_message(t('Registration successful. You are now logged in.'));
+	
+	// @TODO: save temporarily data in db for register
+	drupal_goto('user/register/success/'.$account->uid, array( 'query'=>array('uid'=>$account->uid)));
+}
+
+function zdigital_admin_user_login_submit($form, &$form_state) {
+
+	$form_state['redirect'] = 'admin/dashboard';
+}
+
+function zdigital_theme($existing, $type, $theme, $path) {
+	return array(
+		'slideshow'=>array(
+			'variables'=>array( 'limit'=>4 ),
+			'render element' => 'element',
+			'template' => 'slideshow',
+			'path'=>drupal_get_path('module', 'zdigital') . '/template/',
+		),
+		'zdigital_podcast_iframe_player' => array(
+			'variables' => array('embid'=>'', 'width'=>960, 'width'=>325),
+			'render element' => 'element',
+		),
+		'zdigital_podcast_video_player' => array(
+			'variables' => array('filepath'=>''),
+			'render element' => 'element',
+			'path'=>drupal_get_path('module', 'zdigital') . '/template/',
+			'template' => 'zdigital-podcast-video-player'
+		),
+		'podcasts'=>array(
+			'variables'=>array(
+				'items'=>array()
+			),
+			'render element'=>'elements',
+			'path'=>drupal_get_path('module', 'zdigital') . '/template/',
+			'template'=>'podcasts'
+		),
+		'zdigital_programming'=>array(
+			'variables'=>array(
+				'items'=>array()
+			),
+			'render element'=>'elements',
+			'path'=>drupal_get_path('module', 'zdigital') . '/template/',
+			'template'=>'zdigital-programming'
+		),
+		'zdigital_register_form'=>array(
+			// 'variables' => array('form'=>array()),
+			'render element'=>'form',
+			'path'=>drupal_get_path('module', 'zdigital') . '/template/',
+			'template'=>'zdigital-register-form'
+		),
+		'zdigital_podcast_player' => array(
+			'variables' => array('embid'=>''),
+			'render element' => 'element',
+			'path'=>drupal_get_path('module', 'zdigital') . '/template/',
+			'template' => 'zdigital-podcast-player'
+		),
+		'more_recent_by_author' => array(
+			'variables' => array('artciles'=>array(), 'author'=>null),
+			'render element' => 'element',
+			'path'=>drupal_get_path('module', 'zdigital') . '/template/',
+			'template' => 'more-recent-by-author'
+		)
+	);
+}
+
+/**
+ * hook_block_info
+ */
+function zdigital_block_info() {
+	$blocks = array();
+	$blocks['slideshow'] = array(
+		'info' => t('Slide Show'),
+		'cache' => DRUPAL_CACHE_GLOBAL,
+		'properties' => array('administrative'=>true),
+		'region' => 'front_feature',
+		'status' => 1
+	);
+	$blocks['podcast_member_dashboard'] = array(
+			'info' => t('Member Dashboard'),
+			'cache' => DRUPAL_CACHE_PER_USER,
+			'status' => 0
+	);
+	$blocks['author_recent_blog'] = array(
+			'info' => t('More Articles By Author'),
+			'cache' => DRUPAL_CACHE_GLOBAL,
+			'status' => 0
+	);
+	return $blocks;
+}
+
+function zdigital_block_configure($delta = '') {
+	
+	switch($delta) {
+		case 'slideshow':
+			$form = array();
+			$options = array();
+			for($i=1; $i <= 5; $i++){
+				$options[$i] = $i;
+			}
+			$form['zdigital_slideshow_count'] = array(
+				'#title' => 'Max Slide Show Items',
+				'#type' => "select",
+				'#options' => $options,
+				'#default_value' => variable_get('zdigital_slideshow_count', 4)
+			);
+			
+			$options = array(t('Yes'), t('No'));
+			$form['zdigital_slideshow_hide_text'] = array(
+				'#title' => 'Hide Text',
+				'#type' => "select",
+				'#options' => $options,
+				'#default_value' => variable_get('zdigital_slideshow_hide_text', 0)
+			);
+			
+			return $form;
+			
+		case 'podcast_member_dashboard':
+			$form = array();
+			$form['featured_podcast_id'] = array(
+					'#title' => t('Podcast ID'),
+					'#type' => 'textfield',
+					'#default_value' => variable_get('featured_podcast_id', 8131)
+			);
+			return $form;
+	}
+}
+
+function zdigital_block_save($delta = '', $edit = array()) {
+	// @TODO: save the field into the variable table
+	if('slideshow'==$delta && !empty($edit['zdigital_slideshow_count'])) {
+		variable_set('zdigital_slideshow_count', $edit['zdigital_slideshow_count']);
+		variable_set('zdigital_slideshow_hide_text', $edit['zdigital_slideshow_hide_text']);
+	}else if('podcast_member_dashboard'==$delta && !empty($edit['featured_podcast_id'])){
+		variable_set('zdigital_slideshow_count', $edit['featured_podcast_id']);
+	}
+}
+
+function zdigital_block_view($delta = '') {
+	switch($delta) {
+		case 'slideshow':
+			
+			$result = db_select('node', 'n')->fields('n')
+				->condition('n.status', NODE_PUBLISHED)
+				->condition('n.type', 'slideshow')
+				->orderBy('n.changed', 'DESC')
+				->range(0, variable_get('zdigital_slideshow_count', 4))->execute();
+			$nodes = array();
+			foreach($result as $item) {
+				$node = node_load($item->nid);
+				
+				$nodes[] = $node;
+			}
+			
+			$block = array(
+				'title' => '',
+				'content' => theme('slideshow', array('nodes'=>$nodes))
+			);
+			return $block;
+			
+		case 'podcast_member_dashboard':
+			$block = array(
+					'title' => '',
+					'content' => theme_zdigital_podcast_iframe_player(array('embid'=>variable_get('featured_podcast_id', 8131), 'height'=>'267px', 'width'=>'100%'))
+			
+			);
+			return $block;
+			
+		case 'author_recent_blog':
+			if (user_access('access content')) {
+				$current_node = node_load(arg(1));
+				
+				list($author) = field_get_items('node', $current_node, 'field_author_name');
+				$author['name'] = $author['value'];
+				
+				$query = db_select('node', 'n')
+				->fields('n', array('nid', 'title', 'created'));
+				$query->leftJoin('field_data_field_author_name', 'author', 'author.entity_id=n.nid');
+				
+				$result = $query->condition('n.type', 'blog')
+				->condition('n.status', 1)
+				->condition('n.nid', $current_node->nid, '!=')
+// 				->condition('uid', $current_node->uid)
+				->condition('author.field_author_name_value', $author['value'])
+				->orderBy('created', 'DESC')
+				->range(0, variable_get('blog_block_count', 10))
+				->addTag('node_access')
+				->execute();
+				
+				$block['content'] = theme('more_recent_by_author', array('artciles'=>$result, 'author'=>(Object)$author));
+			}
+			return $block;
+	}
+}
+
+function is_ajax() {
+	if((!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 'xmlhttprequest' == strtolower($_SERVER['HTTP_X_REQUESTED_WITH'])) || !empty($_REQUEST['ajax'])) {
+		return TRUE;
+	}
+	
+	return FALSE;
+}
+
+function theme_zdigital_podcast_iframe_player($variables){
+
+	return '<iframe src="'.url('podcasts/8131/player', array('absolute'=>true)).'" frameborder="0" width="'.$variables['width'].'" height="'.$variables['height'].'" scrolling="no"></iframe>';
+}
+
+function theme_zdigital_podcast_video_iframe_player($variables) {
+	
+	return '<iframe src="'.url('podcasts/'.$variables['nid'].'/video_player', array('absolute'=>true)).'" frameborder="0" width="'.$variables['width'].'" height="'.$variables['height'].'" scrolling="no"></iframe>';
+};

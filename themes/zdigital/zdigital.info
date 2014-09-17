@@ -1,0 +1,21 @@
+name = Zdigital
+description = Zdigital.com custom theme
+package = zdigital
+core = 7.x
+
+
+stylesheets[all][] = css/bootstrap.min.css
+stylesheets[all][] = css/style.css
+
+scripts[] = js/bootstrap.min.js
+scripts[] = js/slideshow.js
+scripts[] = js/script.js
+
+
+
+regions[header] = Header
+regions[front_feature] = Front Feature Area
+regions[front_instructor] = Front Instructor Area
+regions[front_subscribe] = Front Suscribe Area
+regions[content] = Content
+regions[right_sidebar] = Right Sidebar

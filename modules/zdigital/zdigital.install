@@ -1,0 +1,47 @@
+<?php
+/**
+ * @file: zdigital.install
+ * @author: arjun<arjun0819@gmail.com>                                      
+ * @date: Mar 26, 2014 1:30:41 PM
+ * @encode: UTF-8
+ */
+function zdigital_schema() {
+	$schema = array();
+// 	$schema['countries'] = array(
+// 		'description' => t('Store all countries in the world'),
+// 		'fields' => array(
+// 			'country_id' => array(
+// 				'type' => 'serial',
+// 				'unsignle' => TRUE
+// 			),
+// 		)
+// 	);
+	return $schema;
+}
+
+function zdigital_install() {
+	
+	zdigital_update_7102();
+}
+
+function zdigital_uninstall() {
+	
+}
+
+/**
+ * Translate English Country names to Spanish
+ */
+function zdigital_update_7101(&$sandbox) {
+	$total = 0;
+	
+	return t("Translate countries total: @total", array('@total'=>$total));
+}
+
+/**
+ * Add a new field called "country_name_es" into countries table
+ */
+function zdigital_update_7102(&$sandbox) {
+	
+	db_query("ALTER TABLE  `countries` ADD  `country_name_es` VARCHAR( 100 ) NOT NULL AFTER  `country_name`");
+	return t('Alter table success');
+}
